@@ -48,17 +48,18 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
             if resp.status_code == 200:
                 result = resp.json()
                 # 约定接口返回 {"sensitive": true/false, ...}
-                return result.get("sensitive", True)
+                return result.get("sensitive", False)
             else:
                 # 如果接口异常，默认不触发敏感词
                 print(f"Sensitive check failed with status {resp.status_code}", file=sys.stderr)
-                return True
+                return False
         except Exception as e:
             print(f"Sensitive check error: {e}", file=sys.stderr)
-            return True
+            return False
 
     # 检查 summary 字段
     if is_sensitive(item.get("summary", "")):
+        print(f"Item {item.get('id', 'unknown')} summary is sensitive, skipping.", file=sys.stderr)
         return None
 
     """处理单个数据项"""
@@ -109,6 +110,7 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
     # 检查 AI 生成的所有字段
     for v in item.get("AI", {}).values():
         if is_sensitive(str(v)):
+            print(f"Item {item.get('id', 'unknown')} AI content is sensitive, skipping.", file=sys.stderr)
             return None
     return item
 
@@ -145,28 +147,22 @@ def process_all_items(data: List[Dict], model_name: str, language: str, max_work
                 processed_data[idx] = result
             except Exception as e:
                 print(f"Item at index {idx} generated an exception: {e}", file=sys.stderr)
-                # Add default AI fields to ensure consistency
-                processed_data[idx] = data[idx]
-                processed_data[idx]['AI'] = {
-                    "tldr": "Processing failed",
-                    "motivation": "Processing failed",
-                    "method": "Processing failed",
-                    "result": "Processing failed",
-                    "conclusion": "Processing failed"
-                }
-    
+                # # Add default AI fields to ensure consistency
+                # processed_data[idx] = data[idx]
+                # processed_data[idx]['AI'] = {
+                #     "tldr": "Processing failed",
+                #     "motivation": "Processing failed",
+                #     "method": "Processing failed",
+                #     "result": "Processing failed",
+                #     "conclusion": "Processing failed"
+                # }
+
     return processed_data
 
 def main():
     args = parse_args()
     model_name = os.environ.get("MODEL_NAME", 'deepseek-chat')
     language = os.environ.get("LANGUAGE", 'Chinese')
-
-    # 检查并删除目标文件
-    target_file = args.data.replace('.jsonl', f'_AI_enhanced_{language}.jsonl')
-    if os.path.exists(target_file):
-        os.remove(target_file)
-        print(f'Removed existing file: {target_file}', file=sys.stderr)
 
     # 读取数据
     data = []
@@ -182,22 +178,55 @@ def main():
             seen_ids.add(item['id'])
             unique_data.append(item)
 
-    data = unique_data
-    print('Open:', args.data, file=sys.stderr)
+    target_file = args.data.replace('.jsonl', f'_AI_enhanced_{language}.jsonl')
+    try:
+        # 目标文件如果存在缓存，过滤掉已处理的数据
+        if os.path.exists(target_file):
+            processed_ids = set()
+            with open(target_file, "r") as f:
+                for line in f:
+                    processed_item = json.loads(line)
+                    processed_ids.add(processed_item['id'])
+            unique_data2 = [item for item in unique_data if item['id'] not in processed_ids]
+            print(f'Skipped {len(unique_data)}-{len(unique_data2)}={len(unique_data) - len(unique_data2)} already processed items.', file=sys.stderr)
+            unique_data = unique_data2
+
+    except Exception as e:
+        os.remove(target_file)
+        print(f"Error reading target file {target_file}: {e}", file=sys.stderr)
+        print(f'Removed existing file: {target_file}', file=sys.stderr)
+
+    finally:
+        data = unique_data
+        print('Open:', args.data, file=sys.stderr)
+        print(f'Total items to process: {len(data)}', file=sys.stderr)
     
-    # 并行处理所有数据
-    processed_data = process_all_items(
-        data,
-        model_name,
-        language,
-        args.max_workers
-    )
-    
-    # 保存结果
-    with open(target_file, "w") as f:
-        for item in processed_data:
-            if item is not None:
-                f.write(json.dumps(item) + "\n")
+    has_error = False
+    try:
+        # 并行处理所有数据
+        processed_data = process_all_items(
+            data,
+            model_name,
+            language,
+            args.max_workers
+        )
+    except Exception as e:
+        print(f"Error during processing: {e}", file=sys.stderr)
+        has_error = True
+
+    finally:
+        # 保存结果
+        try:
+            with open(target_file, "a") as f:
+                for item in processed_data:
+                    if item is not None:
+                        f.write(json.dumps(item) + "\n")
+        except Exception as save_e:
+            print(f"Error saving results: {save_e}", file=sys.stderr)
+            has_error = True
+
+    print("AI_FAILED" if has_error else "AI_COMPLETED", file=sys.stderr)
+
 
 if __name__ == "__main__":
     main()

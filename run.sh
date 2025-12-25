@@ -59,18 +59,18 @@ echo "本地测试：爬取 $today 的arXiv论文... / Local test: Crawling $tod
 echo "步骤1：开始爬取... / Step 1: Starting crawl..."
 
 # 检查今日文件是否已存在，如存在则删除 / Check if today's file exists, delete if found
-if [ -f "data/${today}.jsonl" ]; then
+if [ -f "data/crawler-data/${today}.jsonl" ]; then
     echo "🗑️ 发现今日文件已存在，正在删除重新生成... / Found existing today's file, deleting for fresh start..."
-    rm "data/${today}.jsonl"
-    echo "✅ 已删除现有文件：data/${today}.jsonl / Deleted existing file: data/${today}.jsonl"
+    rm "data/crawler-data/${today}.jsonl"
+    echo "✅ 已删除现有文件：data/crawler-data/${today}.jsonl / Deleted existing file: data/crawler-data/${today}.jsonl"
 else
     echo "📝 今日文件不存在，准备新建... / Today's file doesn't exist, ready to create new one..."
 fi
 
 cd daily_arxiv
-scrapy crawl arxiv -o ../data/${today}.jsonl
+scrapy crawl arxiv -o ../data/crawler-data/${today}.jsonl
 
-if [ ! -f "../data/${today}.jsonl" ]; then
+if [ ! -f "../data/crawler-data/${today}.jsonl" ]; then
     echo "爬取失败，未生成数据文件 / Crawling failed, no data file generated"
     exit 1
 fi
@@ -104,7 +104,7 @@ cd ..
 if [ "$PARTIAL_MODE" = "false" ]; then
     echo "步骤3：AI增强处理... / Step 3: AI enhancement processing..."
     cd ai
-    python enhance.py --data ../data/${today}.jsonl
+    python enhance.py --data ../data/crawler-data/${today}.jsonl
     
     if [ $? -ne 0 ]; then
         echo "❌ AI处理失败 / AI processing failed"
@@ -120,9 +120,9 @@ fi
 echo "步骤4：转换为Markdown... / Step 4: Converting to Markdown..."
 cd to_md
 
-if [ "$PARTIAL_MODE" = "false" ] && [ -f "../data/${today}_AI_enhanced_${LANGUAGE}.jsonl" ]; then
+if [ "$PARTIAL_MODE" = "false" ] && [ -f "../data/crawler-data/${today}_AI_enhanced_${LANGUAGE}.jsonl" ]; then
     echo "📄 使用AI增强后的数据进行转换... / Using AI enhanced data for conversion..."
-    python convert.py --data ../data/${today}_AI_enhanced_${LANGUAGE}.jsonl
+    python convert.py --data ../data/crawler-data/${today}_AI_enhanced_${LANGUAGE}.jsonl
     
     if [ $? -ne 0 ]; then
         echo "❌ Markdown转换失败 / Markdown conversion failed"
@@ -135,7 +135,7 @@ else
         echo "⏭️  跳过Markdown转换（部分模式，需要AI增强数据）/ Skipping Markdown conversion (partial mode, requires AI enhanced data)"
     else
         echo "❌ 错误：未找到AI增强文件 / Error: AI enhanced file not found"
-        echo "AI文件: ../data/${today}_AI_enhanced_${LANGUAGE}.jsonl"
+        echo "AI文件: ../data/crawler-data/${today}_AI_enhanced_${LANGUAGE}.jsonl"
         exit 1
     fi
 fi
@@ -144,7 +144,7 @@ cd ..
 
 # 第五步：更新文件列表 / Step 5: Update file list
 echo "步骤5：更新文件列表... / Step 5: Updating file list..."
-ls data/*.jsonl | sed 's|data/||' > assets/file-list.txt
+ls data/crawler-data/*.jsonl | sed 's|data/crawler-data/||' > data/metadata/file-list.txt
 echo "✅ 文件列表更新完成 / File list updated"
 
 # 完成总结 / Completion summary

@@ -1,3 +1,6 @@
+const KEYWORDS = 'PLACEHOLDER_DEFAULT_KEYWORDS';
+const AUTHORS = 'PLACEHOLDER_DEFAULT_AUTHORS';
+
 document.addEventListener('DOMContentLoaded', () => {
   initSettings();
   initEventListeners();
@@ -19,7 +22,9 @@ function loadKeywordPreferences() {
   
   // 获取保存的关键词，如果没有则使用默认关键词
   let savedKeywords = localStorage.getItem('preferredKeywords');
-  let keywords = []; // 默认无关键词
+  let keywords = KEYWORDS?.trim() === 'PLACEHOLDER_DEFAULT_KEYWORDS' || !KEYWORDS?.trim()
+    ? [] // 默认无关键词
+    : KEYWORDS.split(',').map(k => k.trim()).filter(k => k.length > 0);
   
   if (savedKeywords) {
     try {
@@ -47,8 +52,10 @@ function loadAuthorPreferences() {
   
   // 获取保存的作者，如果没有则为空数组
   let savedAuthors = localStorage.getItem('preferredAuthors');
-  let authors = []; // 默认无作者
-  
+  let authors = AUTHORS?.trim() === 'PLACEHOLDER_DEFAULT_AUTHORS' || !AUTHORS?.trim()
+    ? [] // 默认无作者
+    : AUTHORS.split(',').map(a => a.trim()).filter(a => a.length > 0);
+
   if (savedAuthors) {
     try {
       authors = JSON.parse(savedAuthors);

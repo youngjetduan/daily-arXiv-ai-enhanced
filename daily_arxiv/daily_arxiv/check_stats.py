@@ -74,7 +74,7 @@ def perform_deduplication():
     """
 
     today = datetime.now().strftime("%Y-%m-%d")
-    today_file = f"../data/{today}.jsonl"
+    today_file = f"../data/crawler-data/{today}.jsonl"
     history_days = 7  # 向前追溯几天的数据进行对比
 
     if not os.path.exists(today_file):
@@ -92,7 +92,7 @@ def perform_deduplication():
         history_ids = set()
         for i in range(1, history_days + 1):
             date_str = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
-            history_file = f"../data/{date_str}.jsonl"
+            history_file = f"../data/crawler-data/{date_str}.jsonl"
             _, past_ids = load_papers_data(history_file)
             history_ids.update(past_ids)
 

@@ -1,4 +1,4 @@
 exclude:
-  - data/*.md
+  - data/crawler-data/*.md
 include:
-  - data/*.json
+  - data/crawler-data/*.json
