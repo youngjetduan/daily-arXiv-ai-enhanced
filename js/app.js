@@ -1117,20 +1117,36 @@ function renderPapers() {
       ? highlightMatches(paper.summary, titleSummaryTerms, 'keyword-highlight') 
       : paper.summary;
 
-    // 高亮作者（作者过滤 + 文本搜索）
+    // 高亮作者（作者过滤 + 文本搜索） — 生成完整高亮 HTML，但卡片显示可能会截断
     const authorTerms = [];
     if (activeAuthors.length > 0) authorTerms.push(...activeAuthors);
     if (textSearchQuery && textSearchQuery.trim().length > 0) authorTerms.push(textSearchQuery.trim());
-    const highlightedAuthors = authorTerms.length > 0 
+    const highlightedAuthorsFull = authorTerms.length > 0 
       ? highlightMatches(paper.authors, authorTerms, 'author-highlight') 
       : paper.authors;
+
+    // 卡片中作者列表过长时进行截断显示（当作者数 >= 6 时），但不影响匹配逻辑。
+    // 这里解析原始作者字符串以获取准确数量，并从完整高亮 HTML 中切分出每个作者的片段用于展示。
+    let totalAuthors = (paper.authors || '').split(/,\s*/).map(s => s.trim()).filter(Boolean).length;
+    let displayAuthorsHtml = highlightedAuthorsFull;
+    try {
+      const authorList = (paper.authors || '').split(/,\s*/).map(s => s.trim()).filter(Boolean);
+      if (authorList.length >= 6) {
+        const parts = highlightedAuthorsFull.split(/,\s*/);
+        const shownCount = 6;
+        const shown = parts.slice(0, shownCount).join(', ');
+        displayAuthorsHtml = `${shown}, 等 ${authorList.length} 人`;
+      }
+    } catch (e) {
+      displayAuthorsHtml = highlightedAuthorsFull;
+    }
     
     paperCard.innerHTML = `
       <div class="paper-card-index">${index + 1}</div>
       ${paper.isMatched ? '<div class="match-badge" title="匹配您的搜索条件"></div>' : ''}
       <div class="paper-card-header">
         <h3 class="paper-card-title">${highlightedTitle}</h3>
-        <p class="paper-card-authors">${highlightedAuthors}</p>
+        <p class="paper-card-authors">${displayAuthorsHtml}</p>
         <div class="paper-card-categories">
           ${categoryTags}
         </div>
