@@ -12,7 +12,7 @@ const APP_CONFIG = {
      * Default keywords for filtering papers
      * This will be replaced during GitHub Actions workflow execution
      */
-    defaultKeywords: '',
+    defaultKeywords: 'deepseek, qwen, sparse, long context, memory, cot, kvcache, attention, efficient',
 
     /**
      * Default authors for filtering papers
