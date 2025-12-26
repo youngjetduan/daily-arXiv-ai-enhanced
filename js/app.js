@@ -29,8 +29,9 @@ function loadUserKeywords() {
       activeKeywords = [];
     }
   } else {
-    userKeywords = [];
-    activeKeywords = [];
+    // 使用默认关键词
+    userKeywords = APP_CONFIG.defaultKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    activeKeywords = [...userKeywords];
   }
   
   // renderKeywordTags();
@@ -51,8 +52,9 @@ function loadUserAuthors() {
       activeAuthors = [];
     }
   } else {
-    userAuthors = [];
-    activeAuthors = [];
+    // 使用默认作者
+    userAuthors = APP_CONFIG.defaultAuthors.split(',').map(a => a.trim()).filter(a => a.length > 0);
+    activeAuthors = [...userAuthors];
   }
   
   renderFilterTags();
