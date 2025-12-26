@@ -35,6 +35,8 @@ def load_papers_data(file_path):
             for line in f:
                 if line.strip():
                     data = json.loads(line)
+                    if data.get('id', '') in ids:
+                        continue
                     papers.append(data)
                     ids.add(data.get('id', ''))
         return papers, ids

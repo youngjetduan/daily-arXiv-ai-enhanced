@@ -231,9 +231,10 @@ jobs:
 
         # Inject hash into settings.js
         if [ -f "js/settings.js" ]; then
-          sed -i "s/PLACEHOLDER_DEFAULT_KEYWORDS/$DEFAULT_KEYWORDS/" js/settings.js
-          sed -i "s/PLACEHOLDER_DEFAULT_AUTHORS/$DEFAULT_AUTHORS/" js/settings.js
-          echo "✅ Default keywords and authors injected into js/settings.js"
+          # Replace the entire assignment line for KEYWORDS and AUTHORS so updates apply even after prior replacements
+          sed -i "s@^const KEYWORDS = .*;@const KEYWORDS = '${DEFAULT_KEYWORDS}';@" js/settings.js || true
+          sed -i "s@^const AUTHORS = .*;@const AUTHORS = '${DEFAULT_AUTHORS}';@" js/settings.js || true
+          echo "✅ Default keywords and authors injected/updated into js/settings.js"
         else
           echo "❌ ERROR: js/settings.js not found!"
         fi
