@@ -1284,6 +1284,18 @@ function showPaperDetails(paper, paperIndex) {
   document.getElementById('paperLink').href = paper.url;
   document.getElementById('pdfLink').href = paper.url.replace('abs', 'pdf');
   document.getElementById('htmlLink').href = paper.url.replace('abs', 'html');
+  // 设置 papers.cool 链接（根据 arXiv id）
+  try {
+    const urlStr = paper.url || '';
+    const m = urlStr.match(/\/(?:abs|pdf)\/([^\/?#]+)/);
+    if (m && m[1]) {
+      document.getElementById('papersCoolLink').href = `https://papers.cool/arxiv/${m[1]}`;
+    } else {
+      document.getElementById('papersCoolLink').href = '#';
+    }
+  } catch (e) {
+    document.getElementById('papersCoolLink').href = '#';
+  }
   // 提示词来自：https://papers.cool/
   prompt = `请你阅读这篇文章${paper.url.replace('abs', 'pdf')},总结一下这篇文章解决的问题、相关工作、研究方法、做了什么实验及其结果、结论，最后整体总结一下这篇文章的内容`
   document.getElementById('kimiChatLink').href = `https://www.kimi.com/_prefill_chat?prefill_prompt=${prompt}&system_prompt=你是一个学术助手，后面的对话将围绕着以下论文内容进行，已经通过链接给出了论文的PDF和论文已有的FAQ。用户将继续向你咨询论文的相关问题，请你作出专业的回答，不要出现第一人称，当涉及到分点回答时，鼓励你以markdown格式输出。&send_immediately=true&force_search=true`;
