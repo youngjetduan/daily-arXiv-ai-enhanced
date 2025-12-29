@@ -651,6 +651,21 @@ main {
   overflow: visible;
 }
 
+/* 作者列表项样式 */
+.paper-card-authors .author-item {
+  display: inline;
+  white-space: nowrap;
+}
+
+/* 作者省略号样式 */
+.paper-card-authors .author-ellipsis {
+  display: inline;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  margin: 0 2px;
+  user-select: none;
+}
+
 .paper-card-categories {
   display: flex;
   flex-wrap: wrap;

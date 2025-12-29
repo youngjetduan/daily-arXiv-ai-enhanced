@@ -839,6 +839,59 @@ function highlightMatches(text, terms, className = 'highlight-match') {
   return result;
 }
 
+// 帮助函数：格式化作者列表（用于论文卡片显示）
+// 规则：≤4个作者全部显示，>4个作者显示前2+后2，中间用省略号
+function formatAuthorsForCard(authorsString, authorTerms = []) {
+  if (!authorsString) {
+    return '';
+  }
+  
+  // 将作者字符串解析为数组（处理逗号分隔的情况）
+  const authorsArray = authorsString.split(',').map(author => author.trim()).filter(author => author.length > 0);
+  
+  if (authorsArray.length === 0) {
+    return '';
+  }
+  
+  // 如果不超过4个作者，全部显示
+  if (authorsArray.length <= 4) {
+    return authorsArray.map(author => {
+      // 对每个作者应用高亮
+      const highlightedAuthor = authorTerms.length > 0 
+        ? highlightMatches(author, authorTerms, 'author-highlight')
+        : author;
+      return `<span class="author-item">${highlightedAuthor}</span>`;
+    }).join(', ');
+  }
+  
+  // 超过4个作者：显示前2个、省略号、后2个
+  const firstTwo = authorsArray.slice(0, 2);
+  const lastTwo = authorsArray.slice(-2);
+  
+  const result = [];
+  
+  // 前2个作者
+  firstTwo.forEach(author => {
+    const highlightedAuthor = authorTerms.length > 0 
+      ? highlightMatches(author, authorTerms, 'author-highlight')
+      : author;
+    result.push(`<span class="author-item">${highlightedAuthor}</span>`);
+  });
+  
+  // 省略号
+  result.push('<span class="author-ellipsis">...</span>');
+  
+  // 后2个作者
+  lastTwo.forEach(author => {
+    const highlightedAuthor = authorTerms.length > 0 
+      ? highlightMatches(author, authorTerms, 'author-highlight')
+      : author;
+    result.push(`<span class="author-item">${highlightedAuthor}</span>`);
+  });
+  
+  return result.join(', ');
+}
+
 function renderPapers() {
   const container = document.getElementById('paperContainer');
   container.innerHTML = '';
@@ -1123,32 +1176,16 @@ function renderPapers() {
     const authorTerms = [];
     if (activeAuthors.length > 0) authorTerms.push(...activeAuthors);
     if (textSearchQuery && textSearchQuery.trim().length > 0) authorTerms.push(textSearchQuery.trim());
-    const highlightedAuthorsFull = authorTerms.length > 0 
-      ? highlightMatches(paper.authors, authorTerms, 'author-highlight') 
-      : paper.authors;
-
-    // 卡片中作者列表过长时进行截断显示（当作者数 >= 6 时），但不影响匹配逻辑。
-    // 这里解析原始作者字符串以获取准确数量，并从完整高亮 HTML 中切分出每个作者的片段用于展示。
-    let totalAuthors = (paper.authors || '').split(/,\s*/).map(s => s.trim()).filter(Boolean).length;
-    let displayAuthorsHtml = highlightedAuthorsFull;
-    try {
-      const authorList = (paper.authors || '').split(/,\s*/).map(s => s.trim()).filter(Boolean);
-      if (authorList.length >= 6) {
-        const parts = highlightedAuthorsFull.split(/,\s*/);
-        const shownCount = 6;
-        const shown = parts.slice(0, shownCount).join(', ');
-        displayAuthorsHtml = `${shown}, 等 ${authorList.length} 人`;
-      }
-    } catch (e) {
-      displayAuthorsHtml = highlightedAuthorsFull;
-    }
+    
+    // 格式化作者列表（应用截断规则和高亮）
+    const formattedAuthors = formatAuthorsForCard(paper.authors, authorTerms);
     
     paperCard.innerHTML = `
       <div class="paper-card-index">${index + 1}</div>
       ${paper.isMatched ? '<div class="match-badge" title="匹配您的搜索条件"></div>' : ''}
       <div class="paper-card-header">
         <h3 class="paper-card-title">${highlightedTitle}</h3>
-        <p class="paper-card-authors">${displayAuthorsHtml}</p>
+        <p class="paper-card-authors">${formattedAuthors}</p>
         <div class="paper-card-categories">
           ${categoryTags}
         </div>
