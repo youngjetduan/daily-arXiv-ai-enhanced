@@ -200,6 +200,46 @@ jobs:
           esac
         fi
 
+    - name: Send WeChat Bot Notification
+      if: always()
+      run: |
+        source .venv/bin/activate
+        echo "📤 发送企业微信通知... / Sending WeChat bot notification..."
+        
+        # 获取环境变量
+        WECHAT_WEBHOOK_URL="${{ secrets.WECHAT_WEBHOOK_URL }}"
+        today=$(date -u "+%Y-%m-%d")
+        
+        if [ -z "$WECHAT_WEBHOOK_URL" ]; then
+          echo "⚠️ 未设置企业微信Webhook URL，跳过推送 / WeChat webhook URL not set, skipping notification"
+          exit 0
+        fi
+        
+        # 根据工作流状态发送不同的通知
+        if [ "${{ steps.dedup_check.outputs.has_new_content }}" = "true" ] && [ "${{ steps.ai_enhance.outputs.ai_success }}" = "true" ]; then
+          # 成功处理新内容
+          echo "✅ 发送成功通知 / Sending success notification"
+          python wechat_bot.py --date "$today" --status "success" --count "-1" --webhook "$WECHAT_WEBHOOK_URL"
+          
+        elif [ "${{ steps.dedup_check.outputs.has_new_content }}" = "false" ]; then
+          # 无新内容
+          echo "ℹ️ 发送无新内容通知 / Sending no content notification"
+          python wechat_bot.py --date "$today" --status "no_content" --webhook "$WECHAT_WEBHOOK_URL"
+          
+        else
+          # 处理失败
+          echo "❌ 发送失败通知 / Sending error notification"
+          ERROR_MSG="工作流处理过程中出现错误"
+          if [ "${{ steps.dedup_check.outputs.skip_reason }}" = "processing_error" ]; then
+            ERROR_MSG="去重处理出错"
+          elif [ "${{ steps.ai_enhance.outputs.ai_success }}" != "true" ]; then
+            ERROR_MSG="AI增强处理失败"
+          fi
+          python wechat_bot.py --date "$today" --status "error" --error "$ERROR_MSG" --webhook "$WECHAT_WEBHOOK_URL"
+        fi
+        
+        echo "✅ 企业微信通知发送完成 / WeChat bot notification completed"
+
     - name: Generate password hash and inject into config
       # if: steps.dedup_check.outputs.has_new_content == 'true'
       run: |

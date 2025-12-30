@@ -121,3 +121,32 @@ We sincerely thank the following individuals and organizations for their promoti
 # Star history
 
 [![Stargazers over time](https://starchart.cc/dw-dengwei/daily-arXiv-ai-enhanced.svg?variant=adaptive)](https://starchart.cc/dw-dengwei/daily-arXiv-ai-enhanced)
+
+# 🔔 企业微信推送功能
+
+本项目支持在arXiv论文更新后自动发送通知到企业微信群，让你及时了解最新的论文动态。
+
+## 🚀 快速开始
+
+### 1. 配置企业微信机器人
+- 在企业微信中创建群机器人
+- 获取Webhook URL
+- 在GitHub仓库的Settings → Secrets中设置 `WECHAT_WEBHOOK_URL`
+
+### 2. 详细配置说明
+请查看 [WECHAT_SETUP.md](WECHAT_SETUP.md) 获取完整的配置指南。
+
+## 📋 通知类型
+
+- ✅ **成功更新**：发现新论文并成功处理
+- ℹ️ **无新内容**：去重检查发现无新论文  
+- ❌ **处理失败**：工作流出现错误
+
+## 💡 功能特点
+
+- 🎯 智能去重：避免重复推送相同内容
+- 📊 状态追踪：实时了解工作流执行状态
+- 🔒 安全可靠：使用GitHub Secrets保护敏感信息
+- ⚡ 即时通知：工作流完成后立即推送
+
+配置完成后，每次GitHub Actions运行都会自动发送通知到指定的企业微信群！
