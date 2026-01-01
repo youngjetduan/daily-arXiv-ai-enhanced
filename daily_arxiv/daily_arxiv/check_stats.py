@@ -11,6 +11,7 @@
 import json
 import sys
 import os
+import argparse
 from datetime import datetime, timedelta
 
 def load_papers_data(file_path):
@@ -62,7 +63,7 @@ def save_papers_data(papers, file_path):
         print(f"Error saving {file_path}: {e}", file=sys.stderr)
         return False
 
-def perform_deduplication():
+def perform_deduplication(today_file):
     """
     执行多日去重：删除与历史多日重复的论文条目，保留新内容
     Perform deduplication over multiple past days
@@ -76,7 +77,6 @@ def perform_deduplication():
     """
 
     today = datetime.now().strftime("%Y-%m-%d")
-    today_file = f"../data/crawler-data/{today}.jsonl"
     history_days = 7  # 向前追溯几天的数据进行对比
 
     if not os.path.exists(today_file):
@@ -94,7 +94,7 @@ def perform_deduplication():
         history_ids = set()
         for i in range(1, history_days + 1):
             date_str = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
-            history_file = f"../data/crawler-data/{date_str}.jsonl"
+            history_file = today_file.replace(today, date_str)
             _, past_ids = load_papers_data(history_file)
             history_ids.update(past_ids)
 
@@ -140,11 +140,15 @@ def main():
     1: 无新内容，停止工作流 / No new content, stop workflow
     2: 处理错误 / Processing error
     """
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data", type=str, required=True, help="jsonline data file")
+    args = parser.parse_args()
     
     print("正在执行去重检查... / Performing intelligent deduplication check...", file=sys.stderr)
     
     # 执行去重处理 / Perform deduplication processing
-    dedup_status = perform_deduplication()
+    dedup_status = perform_deduplication(args.data)
     
     if dedup_status == "has_new_content":
         print("✅ 去重完成，发现新内容，继续工作流 / Deduplication completed, new content found, continue workflow", file=sys.stderr)

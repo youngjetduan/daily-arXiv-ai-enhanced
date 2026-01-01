@@ -9,7 +9,7 @@ import json
 import os
 import requests
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import Dict
 
 
 class WeChatBot:
@@ -131,70 +131,16 @@ class WeChatBot:
             return False
 
 
-def get_new_papers_count(date: str) -> int:
-    """
-    获取今日新论文数量
-    
-    Args:
-        date: 日期字符串
-        
-    Returns:
-        int: 新论文数量
-    """
-    file_path = f"data/crawler-data/{date}.jsonl"
-    
-    if not os.path.exists(file_path):
-        return 0
-    
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            count = sum(1 for line in f if line.strip())
-        return count
-    except Exception:
-        return 0
-
-
-def get_sample_papers(date: str, count: int = 5) -> List[Dict]:
-    """
-    获取示例论文数据
-    
-    Args:
-        date: 日期字符串
-        count: 需要获取的论文数量
-        
-    Returns:
-        List[Dict]: 论文数据列表
-    """
-    file_path = f"data/crawler-data/{date}.jsonl"
-    
-    if not os.path.exists(file_path):
-        return []
-    
-    papers = []
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            for i, line in enumerate(f):
-                if i >= count:
-                    break
-                if line.strip():
-                    papers.append(json.loads(line))
-        return papers
-    except Exception:
-        return []
-
-
-def get_papers_count(date: str) -> int:
+def get_papers_count(file_path: str) -> int:
     """
     获取指定日期的论文数量
     
     Args:
-        date: 日期字符串，格式为YYYY-MM-DD
+        file_path: 数据文件路径
         
     Returns:
         int: 论文数量
-    """
-    file_path = f"data/crawler-data/{date}.jsonl"
-    
+    """    
     if not os.path.exists(file_path):
         return 0
     
@@ -209,10 +155,8 @@ def get_papers_count(date: str) -> int:
 
 def main():
     """命令行入口函数"""
-    import argparse
-    
     parser = argparse.ArgumentParser(description="企业微信机器人推送工具")
-    parser.add_argument("--date", required=True, help="日期，格式为YYYY-MM-DD")
+    parser.add_argument("--data", type=str, required=True, help="jsonline data file")
     parser.add_argument("--status", required=True, choices=["success", "no_content", "error"], help="工作流状态")
     parser.add_argument("--count", type=int, default=-1, help="新论文数量（-1表示自动获取）")
     parser.add_argument("--error", default="", help="错误信息")
@@ -221,28 +165,31 @@ def main():
     args = parser.parse_args()
     
     bot = WeChatBot(args.webhook)
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    today_file = args.data
     
     # 如果count为-1，自动获取论文数量
     if args.count == -1 and args.status == "success":
-        args.count = get_papers_count(args.date)
+        args.count = get_papers_count(today_file)
         print(f"📊 自动获取到论文数量: {args.count}篇")
     
     # 根据状态发送相应的通知
     if args.status == "success":
         success = bot.send_workflow_status_notification(
-            date=args.date,
+            date=today,
             status="success",
             new_papers_count=args.count
         )
     elif args.status == "no_content":
         success = bot.send_workflow_status_notification(
-            date=args.date,
+            date=today,
             status="no_content",
             new_papers_count=0
         )
     else:  # error
         success = bot.send_workflow_status_notification(
-            date=args.date,
+            date=today,
             status="error",
             new_papers_count=0,
             error_message=args.error

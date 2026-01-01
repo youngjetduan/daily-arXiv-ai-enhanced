@@ -30,7 +30,7 @@ function loadUserKeywords() {
     }
   } else {
     // 使用默认关键词
-    userKeywords = APP_CONFIG.defaultKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    userKeywords = DATA_CONFIG.defaultKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
     activeKeywords = [...userKeywords];
   }
   
@@ -53,7 +53,7 @@ function loadUserAuthors() {
     }
   } else {
     // 使用默认作者
-    userAuthors = APP_CONFIG.defaultAuthors.split(',').map(a => a.trim()).filter(a => a.length > 0);
+    userAuthors = DATA_CONFIG.defaultAuthors.split(',').map(a => a.trim()).filter(a => a.length > 0);
     activeAuthors = [...userAuthors];
   }
   
@@ -533,7 +533,9 @@ function selectLanguageForDate(date, preferredLanguage = null) {
 
 async function fetchAvailableDates() {
   try {
-    const response = await fetch('data/metadata/file-list.txt');
+    // 从 data 分支获取文件列表
+    const fileListUrl = DATA_CONFIG.getDataUrl('file-list.txt');
+    const response = await fetch(fileListUrl);
     if (!response.ok) {
       console.error('Error fetching file list:', response.status);
       return [];
@@ -661,7 +663,9 @@ async function loadPapersByDate(date) {
   
   try {
     const selectedLanguage = selectLanguageForDate(date);
-    const response = await fetch(`data/crawler-data/${date}_AI_enhanced_${selectedLanguage}.jsonl`);
+    // 从 data 分支获取数据文件
+    const dataUrl = DATA_CONFIG.getDataUrl(`data/${date}_AI_enhanced_${selectedLanguage}.jsonl`);
+    const response = await fetch(dataUrl);
     // 如果文件不存在（例如返回 404），在论文展示区域提示没有论文
     if (!response.ok) {
       if (response.status === 404) {
@@ -1485,7 +1489,9 @@ async function loadPapersByDateRange(startDate, endDate) {
     
     for (const date of validDatesInRange) {
       const selectedLanguage = selectLanguageForDate(date);
-      const response = await fetch(`data/crawler-data/${date}_AI_enhanced_${selectedLanguage}.jsonl`);
+      // 从 data 分支获取数据文件
+      const dataUrl = DATA_CONFIG.getDataUrl(`data/${date}_AI_enhanced_${selectedLanguage}.jsonl`);
+      const response = await fetch(dataUrl);
       const text = await response.text();
       const dataPapers = parseJsonlData(text, date);
       

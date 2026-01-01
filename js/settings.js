@@ -19,7 +19,7 @@ function loadKeywordPreferences() {
   
   // 获取保存的关键词，如果没有则使用默认关键词
   let savedKeywords = localStorage.getItem('preferredKeywords');
-  let keywords = APP_CONFIG.defaultKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
+  let keywords = DATA_CONFIG.defaultKeywords.split(',').map(k => k.trim()).filter(k => k.length > 0);
   
   if (savedKeywords) {
     try {
@@ -47,7 +47,7 @@ function loadAuthorPreferences() {
   
   // 获取保存的作者，如果没有则为空数组
   let savedAuthors = localStorage.getItem('preferredAuthors');
-  let authors = APP_CONFIG.defaultAuthors.split(',').map(a => a.trim()).filter(a => a.length > 0);
+  let authors = DATA_CONFIG.defaultAuthors.split(',').map(a => a.trim()).filter(a => a.length > 0);
 
   if (savedAuthors) {
     try {

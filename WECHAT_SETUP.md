@@ -141,25 +141,9 @@ A: 可以手动运行GitHub Actions工作流来测试。
 - 改进的命令行参数：`--count -1` 表示自动获取论文数量
 - 更清晰的错误处理和日志输出
 
-**优化前（在shell中嵌入Python代码）：**
 ```bash
-NEW_PAPERS_COUNT=$(python -c "
-import json
-import os
-today = '$today'
-file_path = f'data/crawler-data/{today}.jsonl'
-if os.path.exists(file_path):
-    with open(file_path, 'r') as f:
-        count = sum(1 for line in f if line.strip())
-    print(count)
-else:
-    print(0)
-")
-```
-
-**优化后（简洁的shell调用）：**
-```bash
-python wechat_bot.py --date "$today" --status "success" --count "-1" --webhook "$WECHAT_WEBHOOK_URL"
+cd ref-main/notify
+python wechat_bot.py --data ../../ref-data/data/${today}.jsonl --status "success" --count "-1" --webhook "$WECHAT_WEBHOOK_URL"
 ```
 
 #### 2. GitHub Actions工作流优化 (`.github/workflows/run.yml`)
@@ -193,21 +177,21 @@ python wechat_bot.py --date "$today" --status "success" --count "-1" --webhook "
 #### 新的调用方式
 ```bash
 # 自动获取论文数量
-python wechat_bot.py --date "2025-04-30" --status "success" --count "-1" --webhook "$WEBHOOK_URL"
+python wechat_bot.py --data ../../ref-data/data/2025-04-30.jsonl --status "success" --count "-1" --webhook "$WEBHOOK_URL"
 
 # 手动指定论文数量
-python wechat_bot.py --date "2025-04-30" --status "success" --count "15" --webhook "$WEBHOOK_URL"
+python wechat_bot.py --data ../../ref-data/data/2025-04-30.jsonl --status "success" --count "15" --webhook "$WEBHOOK_URL"
 
 # 无新内容通知
-python wechat_bot.py --date "2025-04-30" --status "no_content" --webhook "$WEBHOOK_URL"
+python wechat_bot.py --data ../../ref-data/data/2025-04-30.jsonl --status "no_content" --webhook "$WEBHOOK_URL"
 
 # 错误通知
-python wechat_bot.py --date "2025-04-30" --status "error" --error "处理失败" --webhook "$WEBHOOK_URL"
+python wechat_bot.py --data ../../ref-data/data/2025-04-30.jsonl --status "error" --error "处理失败" --webhook "$WEBHOOK_URL"
 ```
 
 ### 🎉 总结
 
-本次优化成功解决了代码结构问题：
+本次优化解决了代码结构问题：
 
 1. **解决了代码结构问题**：将嵌入的Python代码移到专门的模块中
 2. **提高了代码质量**：更清晰、更可维护的代码结构

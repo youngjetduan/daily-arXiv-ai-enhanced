@@ -9,6 +9,8 @@ on:
   workflow_dispatch:
 
 env:
+  REPO_URL: "https://github.com/${{ github.repository }}.git"
+  AUTH_REPO_URL: "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
   OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
   OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
   PASSWORD: ${{ secrets.ACCESS_PASSWORD }}
@@ -27,38 +29,70 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Clone main branch as a separate repo
+      run: |
+        git clone --branch main $AUTH_REPO_URL ref-main
+
+    - name: Clone data branch as a separate repo
+      run: |
+        git config --global user.email "$EMAIL"
+        git config --global user.name "$NAME"
+                
+        echo "设置 data 分支... / Setting up data branch..."
+        
+        # 检查 data 分支是否存在 / Check if data branch exists
+        if git ls-remote --heads "$REPO_URL" data | grep -q data; then
+          echo "data 分支已存在，克隆 data 分支 / Data branch exists, switching to data branch"
+          git clone --branch data $AUTH_REPO_URL ref-data
+        else
+          echo "data 分支不存在，创建新分支 / Data branch does not exist, creating new branch"
+          git clone --no-checkout $AUTH_REPO_URL ref-data
+          
+          # 创建空的 data 分支 / Create empty data branch
+          cd ref-data
+          git checkout --orphan data
+          git rm -rf --cached . >/dev/null 2>&1 || true
+          # 确保 data 目录存在 / Ensure data directory exists
+          mkdir -p data
+          echo "# Data Branch" > README.md
+          git add README.md
+          git commit -m "chore: initialize data branch"
+          git push origin data
+        fi
 
     - name: Install dependencies
       run: |
+        cd ref-main
         curl -LsSf https://astral.sh/uv/install.sh | sh
         uv sync
         
     - name: Crawl arXiv papers
       id: crawl_step
       run: |
+        cd ref-main
         source .venv/bin/activate
+
         today=$(date -u "+%Y-%m-%d")
         echo "开始爬取 $today 的arXiv论文... / Starting to crawl $today arXiv papers..."
         echo "爬取类别: $CATEGORIES / Crawling categories: $CATEGORIES"
         
         # 检查今日文件是否已存在，如存在则删除 / Check if today's file exists, delete if found
-        if [ -f "data/crawler-data/${today}.jsonl" ]; then
+        if [ -f "../ref-data/data/${today}.jsonl" ]; then
             echo "🗑️ 发现今日文件已存在，正在删除重新生成... / Found existing today's file, deleting for fresh start..."
-            rm "data/crawler-data/${today}.jsonl"
-            echo "✅ 已删除现有文件：data/crawler-data/${today}.jsonl / Deleted existing file: data/crawler-data/${today}.jsonl"
+            rm "../ref-data/data/${today}.jsonl"
+            echo "✅ 已删除现有文件：../ref-data/data/${today}.jsonl / Deleted existing file: ../ref-data/data/${today}.jsonl"
         else
             echo "📝 今日文件不存在，准备新建... / Today's file doesn't exist, ready to create new one..."
         fi
-        
+
         cd daily_arxiv
 
         # 使用Scrapy爬取
         # Use Scrapy to crawl
-        scrapy crawl arxiv -o ../data/crawler-data/${today}.jsonl
+        scrapy crawl arxiv -o ../../ref-data/data/${today}.jsonl
         
         # 检查爬取是否成功 / Check if crawling was successful
-        if [ ! -f "../data/crawler-data/${today}.jsonl" ]; then
+        if [ ! -f "../../ref-data/data/${today}.jsonl" ]; then
             echo "爬取失败，未生成数据文件 / Crawling failed, no data file generated"
             exit 1
         fi
@@ -69,13 +103,15 @@ jobs:
     - name: Check for duplicates
       id: dedup_check
       run: |
+        cd ref-main
         source .venv/bin/activate
-        echo "执行去重检查... / Performing intelligent deduplication check..."
         
         cd daily_arxiv
+        echo "执行去重检查... / Performing intelligent deduplication check..."
+
         # 执行去重检查脚本 / Execute intelligent deduplication check script
         set +e  # 暂时允许命令失败 / Temporarily allow command failure
-        python daily_arxiv/check_stats.py
+        python daily_arxiv/check_stats.py --data ../../ref-data/data/${today}.jsonl
         
         # 获取退出码 / Get exit code
         dedup_exit_code=$?
@@ -107,7 +143,7 @@ jobs:
       if: steps.dedup_check.outputs.has_new_content == 'true'
       uses: actions/cache@v4
       with:
-        path: data/crawler-data/${{ steps.crawl_step.outputs.crawl_date }}_AI_enhanced_${{ env.LANGUAGE }}.jsonl
+        path: ref-data/data/${{ steps.crawl_step.outputs.crawl_date }}_AI_enhanced_${{ env.LANGUAGE }}.jsonl
         key: ai-enhance-cache-${{ steps.crawl_step.outputs.crawl_date }}-${{ github.run_id }}
         restore-keys: |
           ai-enhance-cache-${{ steps.crawl_step.outputs.crawl_date }}-
@@ -116,68 +152,28 @@ jobs:
       id: ai_enhance
       if: steps.dedup_check.outputs.has_new_content == 'true'
       run: |
+        cd ref-main
         source .venv/bin/activate
+
         today=${{ steps.crawl_step.outputs.crawl_date }}
         echo "开始AI增强处理... / Starting AI enhancement processing..."
         
-        cd ai
         echo "使用模型: $MODEL_NAME / Using model: $MODEL_NAME"
         echo "输出语言: $LANGUAGE / Output language: $LANGUAGE"
         echo "并行处理工作线程数: $MAX_WORKERS / Number of parallel worker threads: $MAX_WORKERS"
+
+        cd ai
         
         # 使用AI处理爬取的数据 / Use AI to process the crawled data
         LOG_FILE=$(mktemp)
-        python enhance.py --data ../data/crawler-data/${today}.jsonl --max_workers $MAX_WORKERS 2>&1 | tee $LOG_FILE
+        python enhance.py --data ../../ref-data/data/${today}.jsonl --max_workers $MAX_WORKERS 2>&1 | tee $LOG_FILE
         if tail -10 "$LOG_FILE" | grep -q "AI_FAILED"; then
             echo "❌ AI处理存在错误 / AI processing has errors"
         else
             echo "ai_success=true" >> $GITHUB_OUTPUT
-            echo "AI增强处理完成 / AI enhancement processing completed"
-
-            # 添加生成的文件到git索引 / Add generated files to git index
-            git add ../data/crawler-data/${today}.jsonl
-            git add ../data/crawler-data/${today}_AI_enhanced_${LANGUAGE}.jsonl
+            echo "✅ AI增强处理完成 / AI enhancement processing completed"
         fi
         rm "$LOG_FILE"
-
-    - name: Update file list
-      if: steps.ai_enhance.outputs.ai_success == 'true'
-      run: |
-        echo "更新文件列表... / Updating file list..."
-        ls data/crawler-data/*.jsonl | sed 's|data/crawler-data/||' > data/metadata/file-list.txt
-        echo "文件列表更新完成 / File list updated"
-        
-        # 添加文件列表到git索引 / Add file list to git index
-        git add data/metadata/file-list.txt
-        
-    # - name: Convert to Markdown
-    #   id: convert_md
-    #   if: steps.ai_enhance.outputs.ai_success == 'true'
-    #   run: |
-    #     source .venv/bin/activate
-    #     today=${{ steps.crawl_step.outputs.crawl_date }}
-    #     echo "转换为Markdown格式... / Converting to Markdown format..."
-        
-    #     cd to_md
-        
-    #     # 使用AI增强文件进行转换 / Use AI enhanced file for conversion
-    #     AI_FILE="../data/crawler-data/${today}_AI_enhanced_${LANGUAGE}.jsonl"
-        
-    #     if [ -f "$AI_FILE" ]; then
-    #         echo "使用AI增强文件进行转换... / Using AI enhanced file for conversion..."
-    #         python convert.py --data "$AI_FILE"
-
-    #         # 检查转换是否成功 / Check if conversion was successful
-    #         if [ $? -ne 0 ]; then
-    #             echo "Markdown转换失败 / Markdown conversion failed"
-    #         else
-    #             echo "convert_success=true" >> $GITHUB_OUTPUT
-    #             echo "Markdown转换完成 / Markdown conversion completed"
-    #         fi
-    #     else
-    #         echo "错误：未找到AI增强文件 / Error: AI enhanced file not found"
-    #         echo "AI文件: $AI_FILE"
-    #     fi
 
     - name: Summary
       run: |
@@ -203,28 +199,31 @@ jobs:
     - name: Send WeChat Bot Notification
       if: always()
       run: |
+        cd ref-main
         source .venv/bin/activate
-        echo "📤 发送企业微信通知... / Sending WeChat bot notification..."
         
+        echo "📤 发送企业微信通知... / Sending WeChat bot notification..."
+
         # 获取环境变量
         WECHAT_WEBHOOK_URL="${{ secrets.WECHAT_WEBHOOK_URL }}"
-        today=$(date -u "+%Y-%m-%d")
         
         if [ -z "$WECHAT_WEBHOOK_URL" ]; then
           echo "⚠️ 未设置企业微信Webhook URL，跳过推送 / WeChat webhook URL not set, skipping notification"
           exit 0
         fi
+
+        cd notify
         
         # 根据工作流状态发送不同的通知
         if [ "${{ steps.dedup_check.outputs.has_new_content }}" = "true" ] && [ "${{ steps.ai_enhance.outputs.ai_success }}" = "true" ]; then
           # 成功处理新内容
           echo "✅ 发送成功通知 / Sending success notification"
-          python wechat_bot.py --date "$today" --status "success" --count "-1" --webhook "$WECHAT_WEBHOOK_URL"
+          python wechat_bot.py --data ../../ref-data/data/${today}.jsonl --status "success" --count "-1" --webhook "$WECHAT_WEBHOOK_URL"
           
         elif [ "${{ steps.dedup_check.outputs.has_new_content }}" = "false" ]; then
           # 无新内容
           echo "ℹ️ 发送无新内容通知 / Sending no content notification"
-          python wechat_bot.py --date "$today" --status "no_content" --webhook "$WECHAT_WEBHOOK_URL"
+          python wechat_bot.py --data ../../ref-data/data/${today}.jsonl --status "no_content" --webhook "$WECHAT_WEBHOOK_URL"
           
         else
           # 处理失败
@@ -235,15 +234,16 @@ jobs:
           elif [ "${{ steps.ai_enhance.outputs.ai_success }}" != "true" ]; then
             ERROR_MSG="AI增强处理失败"
           fi
-          python wechat_bot.py --date "$today" --status "error" --error "$ERROR_MSG" --webhook "$WECHAT_WEBHOOK_URL"
+          python wechat_bot.py --data ../../ref-data/data/${today}.jsonl --status "error" --error "$ERROR_MSG" --webhook "$WECHAT_WEBHOOK_URL"
         fi
         
         echo "✅ 企业微信通知发送完成 / WeChat bot notification completed"
 
-    - name: Generate password hash and inject into config
-      # if: steps.dedup_check.outputs.has_new_content == 'true'
+    - name: Inject password hash into auth-config.js
       run: |
-        echo "🔐 Generating password hash for authentication..."
+        cd ref-main
+
+        echo "🔐 注入密码哈希到 auth-config.js... / Injecting password hash into auth-config.js..."
 
         if [ -z "$PASSWORD" ]; then
           echo "⚠️  WARNING: ACCESS_PASSWORD not set in Secrets"
@@ -272,30 +272,60 @@ jobs:
           echo "❌ ERROR: js/auth-config.js not found!"
         fi
 
-        echo "🔐 Authentication setup complete"
+        echo "🔐 密码哈希注入完成 / Authentication setup complete"
 
-    - name: Get default filter keywords & authors and inject into config
-      # if: steps.dedup_check.outputs.has_new_content == 'true'
+    - name: Inject default filter keywords & authors into data-config.js
       run: |
-        echo "🔐 Get default filter keywords & authors..."
+        cd ref-main
 
-        # Inject filter config into app-config.js
-        if [ -f "js/app-config.js" ]; then
+        echo "注入默认过滤关键词及作者列表到 data-config.js... / Injecting default filter keywords & authors into data-config.js..."
+
+        echo "默认关键词 / Default Keywords: $DEFAULT_KEYWORDS"
+        echo "默认作者列表 / Default Authors: $DEFAULT_AUTHORS"
+
+        # Inject filter config into data-config.js
+        if [ -f "js/data-config.js" ]; then
           # Replace the defaultKeywords and defaultAuthors values
-          sed -i "s@defaultKeywords: .*'@defaultKeywords: '${DEFAULT_KEYWORDS}'@" js/app-config.js || true
-          sed -i "s@defaultAuthors: .*'@defaultAuthors: '${DEFAULT_AUTHORS}'@" js/app-config.js || true
-          echo "✅ Default keywords and authors injected/updated into js/app-config.js"
+          sed -i "s@defaultKeywords: .*'@defaultKeywords: '${DEFAULT_KEYWORDS}'@" js/data-config.js || true
+          sed -i "s@defaultAuthors: .*'@defaultAuthors: '${DEFAULT_AUTHORS}'@" js/data-config.js || true
+          echo "✅ Default keywords and authors injected/updated into js/data-config.js"
 
-          git add js/app-config.js
+          git add js/data-config.js
         else
-          echo "❌ ERROR: js/app-config.js not found!"
+          echo "❌ ERROR: js/data-config.js not found!"
         fi
 
-        echo "🔐 Filter keywords and authors setup complete"
-        
-    - name: Commit changes
-      # if: steps.ai_enhance.outputs.ai_success == 'true'
+        echo "🔐 默认过滤配置注入完成 / Default filter config injection complete"
+
+    - name: Inject repository info into data-config.js
       run: |
+        cd ref-main
+
+        echo "🔐 注入仓库信息到 data-config.js... / Injecting repository info into data-config.js..."
+        
+        REPO_OWNER="${{ github.repository_owner }}"
+        REPO_NAME="${{ github.event.repository.name }}"
+        
+        echo "仓库所有者: $REPO_OWNER / Repository owner: $REPO_OWNER"
+        echo "仓库名称: $REPO_NAME / Repository name: $REPO_NAME"
+        
+        # 注入仓库信息到 data-config.js / Inject repository info into data-config.js
+        if [ -f "js/data-config.js" ]; then
+          sed -i "s/PLACEHOLDER_REPO_OWNER/$REPO_OWNER/g" js/data-config.js
+          sed -i "s/PLACEHOLDER_REPO_NAME/$REPO_NAME/g" js/data-config.js
+          echo "✅ 仓库信息已注入到 js/data-config.js / Repository info injected into js/data-config.js"
+          
+          git add js/data-config.js
+        else
+          echo "❌ ERROR: js/data-config.js not found!"
+        fi
+
+        echo "🔐 数据仓库信息注入完成 / Repository info injection complete"
+       
+    - name: Commit code changes to main branch
+      run: |
+        cd ref-main
+
         git config --global user.email "$EMAIL"
         git config --global user.name "$NAME"
         
@@ -305,24 +335,73 @@ jobs:
           exit 0
         fi
         git commit -m "update: $(date -u '+%Y-%m-%d') arXiv papers"
-        echo "✅ 变更已提交 / Changes committed"
         
-    - name: Pull latest changes and push
-      # if: steps.ai_enhance.outputs.ai_success == 'true'
+        echo "✅ 变更已提交 / Changes committed"
+
+    - name: Push code changes to main branch
       run: |
+        cd ref-main
+        
         # 设置Git配置以处理自动合并 / Set Git config for automatic merging
         git config pull.rebase true
         git config rebase.autoStash true
         
-        # 尝试推送，如果失败则拉取并重试 / Try to push, if failed then pull and retry
+        # 尝试推送代码变更到 main 分支 / Try to push code changes to main branch
         for i in {1..3}; do
-          echo "推送尝试 $i / Push attempt $i"
+          echo "推送代码变更尝试 $i / Push code changes attempt $i"
           if git push origin main; then
             echo "✅ 推送成功 / Push successful"
             break
           else
             echo "🟡 推送失败，拉取最新变更... / Push failed, pulling latest changes..."
             git pull origin main --no-edit || true
+            if [ $i -eq 3 ]; then
+              echo "❌ 3次尝试后推送失败 / Failed to push after 3 attempts"
+            fi
+          fi
+        done
+
+    - name: Setup and commit to data branch
+      if: steps.ai_enhance.outputs.ai_success == 'true'
+      run: |
+        cd ref-data
+
+        git config --global user.email "$EMAIL"
+        git config --global user.name "$NAME"
+
+        echo "更新文件列表... / Updating file list..."
+        ls data/*.jsonl | sed 's|data/||' > file-list.txt
+        
+        # 只添加数据文件 / Only add data files
+        git add data/*.jsonl 2>/dev/null || true
+        git add file-list.txt 2>/dev/null || true
+        
+        # 检查是否有数据变更需要提交 / Check if there are data changes to commit
+        if git diff --staged --quiet; then
+          echo "🟡 没有数据变更需要提交 / No data changes to commit"
+        else
+          today=${{ steps.crawl_step.outputs.crawl_date }}
+          git commit -m "update: $today arXiv papers"
+          echo "✅ 数据变更已提交到 data 分支 / Data changes committed to data branch"
+        fi
+
+    - name: Push data changes to data branch
+      run: |
+        cd ref-data
+
+        # 设置Git配置以处理自动合并 / Set Git config for automatic merging
+        git config pull.rebase true
+        git config rebase.autoStash true
+
+        # 尝试推送代码变更到 data 分支 / Try to push code changes to data branch
+        for i in {1..3}; do
+          echo "推送代码变更尝试 $i / Push code changes attempt $i"
+          if git push origin data; then
+            echo "✅ 推送成功 / Push successful"
+            break
+          else
+            echo "🟡 推送失败，拉取最新变更... / Push failed, pulling latest changes..."
+            git pull origin data --no-edit || true
             if [ $i -eq 3 ]; then
               echo "❌ 3次尝试后推送失败 / Failed to push after 3 attempts"
             fi
