@@ -389,6 +389,7 @@ jobs:
         fi
 
     - name: Push data changes to data branch
+      if: steps.ai_enhance.outputs.ai_success == 'true'
       run: |
         cd ref-data
 
