@@ -106,8 +106,10 @@ jobs:
         cd ref-main
         source .venv/bin/activate
         
-        cd daily_arxiv
+        today=${{ steps.crawl_step.outputs.crawl_date }}
         echo "执行去重检查... / Performing intelligent deduplication check..."
+
+        cd daily_arxiv
 
         # 执行去重检查脚本 / Execute intelligent deduplication check script
         set +e  # 暂时允许命令失败 / Temporarily allow command failure
@@ -202,6 +204,7 @@ jobs:
         cd ref-main
         source .venv/bin/activate
         
+        today=${{ steps.crawl_step.outputs.crawl_date }}
         echo "📤 发送企业微信通知... / Sending WeChat bot notification..."
 
         # 获取环境变量
