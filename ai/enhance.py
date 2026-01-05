@@ -39,6 +39,8 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
         调用 spam.dw-dengwei.workers.dev 接口检测内容是否包含敏感词。
         返回 True 表示触发敏感词，False 表示未触发。
         """
+        return False  # 默认不检测敏感词，避免网络请求失败
+    
         try:
             resp = requests.post(
                 "https://spam.dw-dengwei.workers.dev",

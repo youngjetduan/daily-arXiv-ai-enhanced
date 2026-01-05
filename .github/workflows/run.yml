@@ -221,12 +221,12 @@ jobs:
         if [ "${{ steps.dedup_check.outputs.has_new_content }}" = "true" ] && [ "${{ steps.ai_enhance.outputs.ai_success }}" = "true" ]; then
           # 成功处理新内容
           echo "✅ 发送成功通知 / Sending success notification"
-          python wechat_bot.py --data ../../ref-data/data/${today}.jsonl --status "success" --count "-1" --webhook "$WECHAT_WEBHOOK_URL"
+          python wechat_bot.py --data ../../ref-data/data/${today}_AI_enhanced_${{ env.LANGUAGE }}.jsonl --status "success" --count "-1" --webhook "$WECHAT_WEBHOOK_URL"
           
         elif [ "${{ steps.dedup_check.outputs.has_new_content }}" = "false" ]; then
           # 无新内容
           echo "ℹ️ 发送无新内容通知 / Sending no content notification"
-          python wechat_bot.py --data ../../ref-data/data/${today}.jsonl --status "no_content" --webhook "$WECHAT_WEBHOOK_URL"
+          python wechat_bot.py --data ../../ref-data/data/${today}_AI_enhanced_${{ env.LANGUAGE }}.jsonl --status "no_content" --webhook "$WECHAT_WEBHOOK_URL"
           
         else
           # 处理失败
@@ -237,7 +237,7 @@ jobs:
           elif [ "${{ steps.ai_enhance.outputs.ai_success }}" != "true" ]; then
             ERROR_MSG="AI增强处理失败"
           fi
-          python wechat_bot.py --data ../../ref-data/data/${today}.jsonl --status "error" --error "$ERROR_MSG" --webhook "$WECHAT_WEBHOOK_URL"
+          python wechat_bot.py --data ../../ref-data/data/${today}_AI_enhanced_${{ env.LANGUAGE }}.jsonl --status "error" --error "$ERROR_MSG" --webhook "$WECHAT_WEBHOOK_URL"
         fi
         
         echo "✅ 企业微信通知发送完成 / WeChat bot notification completed"
