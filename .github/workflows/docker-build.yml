@@ -28,7 +28,7 @@ jobs:
 
     # 3. 登录到 Docker 仓库
     - name: Log in to Docker Hub
-      if: github.event_name != 'pull_request' && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != ''
+      if: github.event_name != 'pull_request'
       uses: docker/login-action@v3
       with:
         # 使用 GitHub Secrets 中的凭证
@@ -52,7 +52,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        push: ${{ github.event_name != 'pull_request' && secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}  # 未设置 Secrets 或 PR 时不推送
+        push: ${{ github.event_name != 'pull_request' }}  # 未设置 Secrets 或 PR 时不推送
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
