@@ -52,6 +52,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
+        file: ./docker/Dockerfile  # 指定 Dockerfile 路径
         push: ${{ github.event_name != 'pull_request' }}  # 未设置 Secrets 或 PR 时不推送
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
