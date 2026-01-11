@@ -42,23 +42,25 @@ def get_blacklist_keywords() -> List[str]:
     keywords = [k.strip() for k in keywords_str.replace(';', ',').split(',') if k.strip()]
     return keywords
 
-def check_blacklist(content: str, blacklist: List[str]) -> tuple[bool, List[str]]:
+def check_blacklist(content: str, blacklist: List[str]) -> tuple[bool, str]:
     """
     检查内容是否包含黑名单关键词。
-    返回 (是否应该过滤, 匹配的关键词列表)。
+    返回 (是否应该过滤, 第一个匹配的关键词)。
     """
     if not blacklist:
-        return False, []
+        return False, ""
     
     content_lower = content.lower()
-    matching_keywords = [k for k in blacklist if k.lower() in content_lower]
-    return bool(matching_keywords), matching_keywords
+    for keyword in blacklist:
+        if keyword.lower() in content_lower:
+            return True, keyword
+    return False, ""
 
 def process_single_item(chain, item: Dict, language: str, blacklist: List[str]) -> Dict:
     # 检查 summary 字段是否包含黑名单关键词
-    should_skip, matching_keywords = check_blacklist(item.get("summary", ""), blacklist)
+    should_skip, matched_keyword = check_blacklist(item.get("summary", ""), blacklist)
     if should_skip:
-        print(f"Item {item.get('id', 'unknown')} contains blacklist keywords {matching_keywords}, skipping.", file=sys.stderr)
+        print(f"Item {item.get('id', 'unknown')} contains blacklist keyword '{matched_keyword}', skipping.", file=sys.stderr)
         return None
 
     """处理单个数据项"""
