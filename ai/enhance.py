@@ -33,35 +33,32 @@ def parse_args():
     parser.add_argument("--max_workers", type=int, default=1, help="Maximum number of parallel workers")
     return parser.parse_args()
 
-def process_single_item(chain, item: Dict, language: str) -> Dict:
-    def is_sensitive(content: str) -> bool:
-        """
-        调用 spam.dw-dengwei.workers.dev 接口检测内容是否包含敏感词。
-        返回 True 表示触发敏感词，False 表示未触发。
-        """
-        return False  # 默认不检测敏感词，避免网络请求失败
-    
-        try:
-            resp = requests.post(
-                "https://spam.dw-dengwei.workers.dev",
-                json={"text": content},
-                timeout=5
-            )
-            if resp.status_code == 200:
-                result = resp.json()
-                # 约定接口返回 {"sensitive": true/false, ...}
-                return result.get("sensitive", False)
-            else:
-                # 如果接口异常，默认不触发敏感词
-                print(f"Sensitive check failed with status {resp.status_code}", file=sys.stderr)
-                return False
-        except Exception as e:
-            print(f"Sensitive check error: {e}", file=sys.stderr)
-            return False
+def get_blacklist_keywords() -> List[str]:
+    """从环境变量获取黑名单关键词列表"""
+    keywords_str = os.environ.get("BLACKLIST_KEYWORDS", "")
+    if not keywords_str:
+        return []
+    # 支持逗号、分号或空格分隔的关键词
+    keywords = [k.strip() for k in keywords_str.replace(';', ',').split(',') if k.strip()]
+    return keywords
 
-    # 检查 summary 字段
-    if is_sensitive(item.get("summary", "")):
-        print(f"Item {item.get('id', 'unknown')} summary is sensitive, skipping.", file=sys.stderr)
+def check_blacklist(content: str, blacklist: List[str]) -> tuple[bool, List[str]]:
+    """
+    检查内容是否包含黑名单关键词。
+    返回 (是否应该过滤, 匹配的关键词列表)。
+    """
+    if not blacklist:
+        return False, []
+    
+    content_lower = content.lower()
+    matching_keywords = [k for k in blacklist if k.lower() in content_lower]
+    return bool(matching_keywords), matching_keywords
+
+def process_single_item(chain, item: Dict, language: str, blacklist: List[str]) -> Dict:
+    # 检查 summary 字段是否包含黑名单关键词
+    should_skip, matching_keywords = check_blacklist(item.get("summary", ""), blacklist)
+    if should_skip:
+        print(f"Item {item.get('id', 'unknown')} contains blacklist keywords {matching_keywords}, skipping.", file=sys.stderr)
         return None
 
     """处理单个数据项"""
@@ -109,14 +106,9 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
         if field not in item['AI']:
             item['AI'][field] = default_ai_fields[field]
 
-    # 检查 AI 生成的所有字段
-    for v in item.get("AI", {}).values():
-        if is_sensitive(str(v)):
-            print(f"Item {item.get('id', 'unknown')} AI content is sensitive, skipping.", file=sys.stderr)
-            return None
     return item
 
-def process_all_items(data: List[Dict], model_name: str, language: str, max_workers: int) -> List[Dict]:
+def process_all_items(data: List[Dict], model_name: str, language: str, max_workers: int, blacklist: List[str]) -> List[Dict]:
     """并行处理所有数据项"""
     llm = ChatOpenAI(model=model_name).with_structured_output(Structure, method="function_calling")
     print('Connect to:', model_name, file=sys.stderr)
@@ -133,7 +125,7 @@ def process_all_items(data: List[Dict], model_name: str, language: str, max_work
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # 提交所有任务
         future_to_idx = {
-            executor.submit(process_single_item, chain, item, language): idx
+            executor.submit(process_single_item, chain, item, language, blacklist): idx
             for idx, item in enumerate(data)
         }
         
@@ -165,6 +157,10 @@ def main():
     args = parse_args()
     model_name = os.environ.get("MODEL_NAME", 'deepseek-chat')
     language = os.environ.get("LANGUAGE", 'Chinese')
+    blacklist = get_blacklist_keywords()
+
+    if blacklist:
+        print(f"Blacklist keywords: {blacklist}", file=sys.stderr)
 
     # 读取数据
     data = []
@@ -210,7 +206,8 @@ def main():
             data,
             model_name,
             language,
-            args.max_workers
+            args.max_workers,
+            blacklist
         )
     except Exception as e:
         print(f"Error during processing: {e}", file=sys.stderr)

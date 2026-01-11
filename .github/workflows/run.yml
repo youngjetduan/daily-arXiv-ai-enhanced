@@ -22,6 +22,7 @@ env:
   LANGUAGE: ${{ vars.LANGUAGE || 'Chinese' }}
   DEFAULT_KEYWORDS: ${{ vars.DEFAULT_KEYWORDS || ''}}
   DEFAULT_AUTHORS: ${{ vars.DEFAULT_AUTHORS || '' }}
+  BLACKLIST_KEYWORDS: ${{ vars.BLACKLIST_KEYWORDS || '' }}
 
 jobs:
   build:
