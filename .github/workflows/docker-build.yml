@@ -4,31 +4,31 @@ name: Build and Push Docker Image
 on:
   push:
     branches: [ main ]
-  pull_request:  # 可选：PR 时构建测试镜像
-    branches: [ main ]
   workflow_dispatch:  # 允许手动在 GitHub 界面触发
 
 env:
-  # 设置镜像标签环境变量
-  REGISTRY: docker.io  # 默认 Docker Hub，可改为 ghcr.io
-  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
+  REGISTRY: docker.io
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    
     steps:
     # 1. 检出代码
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
     # 2. 设置 Docker 构建环境
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
+      with:
+        driver-opts: |
+          network=host
 
     # 3. 登录到 Docker 仓库
     - name: Log in to Docker Hub
-      if: github.event_name != 'pull_request'
       uses: docker/login-action@v3
       with:
         # 使用 GitHub Secrets 中的凭证
@@ -37,21 +37,25 @@ jobs:
 
     # 4. 提取元数据（标签、标签等）
     - name: Extract Docker metadata
-      if: github.event_name != 'pull_request'  # PR时不提取
       id: meta
       uses: docker/metadata-action@v5
       with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        images: youngjet95/dailyarxiv
         tags: |
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
           type=raw,value=latest
 
     # 5. 构建并推送镜像
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
+      env:
+        BUILDKIT_PROGRESS: plain
       with:
         context: .
         file: ./docker/Dockerfile  # 指定 Dockerfile 路径
-        push: ${{ github.event_name != 'pull_request' }}  # 未设置 Secrets 或 PR 时不推送
+        platforms: linux/amd64,linux/arm64
+        push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha

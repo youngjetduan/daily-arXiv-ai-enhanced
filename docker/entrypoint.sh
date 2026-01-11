@@ -2,11 +2,14 @@
 set -e
 
 # 配置日志目录
-LOG_DIR="/app/config/logs"
-mkdir -p "$LOG_DIR"
+LOG_DIR="/app/config"
 LOG_FILE="$LOG_DIR/dailyarxiv.log"
 
 echo "📝 日志文件: $LOG_FILE"
+
+if [ -f $LOG_FILE ]; then
+    rm $LOG_FILE
+fi
 
 # 记录日志的函数
 log() {
@@ -31,6 +34,32 @@ if [ -f "/app/config/.env" ]; then
     fi
 else
     log "⚠️  警告: /app/config/.env 不存在，将使用环境变量或默认值"
+fi
+
+# 环境变量检查
+if [ -z "$OPENAI_API_KEY" ]; then
+    echo "❌ 错误: OPENAI_API_KEY 未设置"
+    exit 1
+fi
+
+if [ -z "$GIT_TOKEN" ]; then
+    echo "❌ 错误: GIT_TOKEN 未设置"
+    exit 1
+fi
+
+if [ -z "$GIT_REPO" ]; then
+    echo "❌ 错误: GIT_REPO 未设置"
+    exit 1
+fi
+
+if [ -z "$GIT_EMAIL" ]; then
+    echo "❌ 错误: GIT_EMAIL 未设置"
+    exit 1
+fi
+
+if [ -z "$GIT_NAME" ]; then
+    echo "❌ 错误: GIT_NAME 未设置"
+    exit 1
 fi
 
 # 记录环境变量到日志（脱敏处理）

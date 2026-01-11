@@ -58,15 +58,15 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
 
 # 创建目录结构
 # - /app/config: 配置目录（挂载点，存放 .env 和日志）
-# - /app/ref-main: 代码目录（镜像内置，包含程序代码）
-# - /app/ref-data: 数据目录（挂载点，存放 arXiv 数据和 data 分支）
+# - /app/ref-main: 代码目录
+# - /app/ref-data: 数据目录
 RUN mkdir -p /app/config /app/ref-main /app/ref-data
 
-# 复制项目文件到 ref-main（作为代码目录）
-COPY . /app/ref-main/
+WORKDIR /app
 
-# 使用 uv 安装依赖（在 ref-main 目录中）
-WORKDIR /app/ref-main
+# 使用 uv 安装依赖
+COPY pyproject.toml /app/pyproject.toml
+COPY uv.lock /app/uv.lock
 RUN uv sync --frozen
 
 # 复制 entrypoint.sh 并强制转换为 LF 格式
@@ -77,22 +77,19 @@ RUN sed -i 's/\r$//' /entrypoint.sh.tmp && \
     chmod +x /entrypoint.sh
 
 # 复制 dailyarxiv.sh 到 /app 目录
-# 注意：dailyarxiv.sh 是实际执行 arXiv 爬取和处理的脚本
-RUN mv dailyarxiv.sh /app/dailyarxiv.sh && \
+COPY dailyarxiv.sh /app/dailyarxiv.sh.tmp
+RUN sed -i 's/\r$//' /app/dailyarxiv.sh.tmp && \
+    mv /app/dailyarxiv.sh.tmp /app/dailyarxiv.sh && \
     chmod +x /app/dailyarxiv.sh
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app/ref-main
-ENV UV_VENV=/app/ref-main/.venv
-ENV PATH="/app/ref-main/.venv/bin:$PATH"
+ENV UV_VENV=/app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
-# 回到 /app 目录
-WORKDIR /app
-
-# /app/ref-data 目录用于挂载外部数据存储
 # /app/config 目录用于挂载外部配置和日志
-VOLUME ["/app/ref-data", "/app/config"]
+VOLUME ["/app/config"]
 
 # entrypoint.sh 作为容器入口点
 # 它会：加载环境变量 -> 生成 crontab -> 启动 supercronic

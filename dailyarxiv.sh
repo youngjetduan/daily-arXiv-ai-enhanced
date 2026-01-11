@@ -8,35 +8,26 @@ set -e
 
 echo "=== Docker 环境下执行 arXiv 论文爬取任务 ==="
 
-# 环境变量检查
-if [ -z "$OPENAI_API_KEY" ]; then
-    echo "❌ 错误: OPENAI_API_KEY 未设置"
-    exit 1
-fi
-
-if [ -z "$GIT_TOKEN" ]; then
-    echo "❌ 错误: GIT_TOKEN 未设置"
-    exit 1
-fi
-
-if [ -z "$GIT_REPO" ]; then
-    echo "❌ 错误: GIT_REPO 未设置"
-    exit 1
-fi
-
-if [ -z "$GIT_EMAIL" ]; then
-    echo "❌ 错误: GIT_EMAIL 未设置"
-    exit 1
-fi
-
-if [ -z "$GIT_NAME" ]; then
-    echo "❌ 错误: GIT_NAME 未设置"
-    exit 1
+# 加载环境变量
+if [ -f "/app/config/.env" ]; then
+    echo "📋 从 /app/config/.env 加载环境变量..."
+    if [ -r "/app/config/.env" ]; then
+        # 使用更安全的方式加载环境变量
+        set -a  # 自动导出所有变量
+        source /app/config/.env
+        set +a
+        echo "✅ 环境变量加载完成"
+    else
+        echo "❌ 错误: /app/config/.env 文件不可读"
+        exit 1
+    fi
+else
+    echo "⚠️  警告: /app/config/.env 不存在，将使用环境变量或默认值"
 fi
 
 # 设置默认值
 export OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}"
-export PASSWORD="${PASSWORD:-}"
+export PASSWORD="${ACCESS_PASSWORD:-}"
 export MODEL_NAME="${MODEL_NAME:-deepseek-chat}"
 export CATEGORIES="${CATEGORIES:-}"
 export MAX_WORKERS="${MAX_WORKERS:-1}"
@@ -45,7 +36,7 @@ export DEFAULT_KEYWORDS="${DEFAULT_KEYWORDS:-}"
 export DEFAULT_AUTHORS="${DEFAULT_AUTHORS:-}"
 export WECHAT_WEBHOOK_URL="${WECHAT_WEBHOOK_URL:-}"
 
-echo "🔧 当前配置:"
+echo "🔧 环境变量配置:"
 echo "   OPENAI_BASE_URL: $OPENAI_BASE_URL"
 echo "   MODEL_NAME: $MODEL_NAME"
 echo "   CATEGORIES: $CATEGORIES"
@@ -68,6 +59,38 @@ AUTH_REPO_URL="https://x-access-token:${GIT_TOKEN}@github.com/${GIT_REPO}.git"
 # 工作目录
 REF_MAIN="/app/ref-main"
 REF_DATA="/app/ref-data"
+
+echo ""
+echo "=== 检查 ref-main 目录 ==="
+
+# 检查 /app/ref-main 是否为 Git 仓库
+if [ -d "$REF_MAIN/.git" ]; then
+    echo "ref-main 已是 Git 仓库 / ref-main has already been a Git repository"
+    echo "尝试拉取远程 main 分支最新内容... / Trying to pull latest main branch from remote..."
+
+    cd "$REF_MAIN"
+
+    # 尝试拉取远程更新
+    if git fetch origin main 2>/dev/null && git pull origin main --no-edit 2>/dev/null; then
+        echo "✅ 成功拉取并合并远程 main 分支内容 / Successfully pulled and merged remote main branch"
+    else
+        echo "⚠️  拉取远程 main 分支失败，清空本地内容并重新克隆 / Failed to pull remote main branch, clearing local content and re-cloning..."
+        # 返回上级目录以便清空
+        cd /app
+        # 清空 ref-main 目录中的内容（不删除目录本身）
+        rm -rf "$REF_MAIN"/* "$REF_MAIN"/.* 2>/dev/null || true
+        # 重新克隆 main 分支到 ref-main
+        echo "正在重新克隆 main 分支... / Re-cloning main branch..."
+        git clone --branch main "$AUTH_REPO_URL" "$REF_MAIN"
+        echo "✅ 已重新克隆 main 分支 / Re-cloned main branch successfully"
+    fi
+else
+    echo "ref-main 不是 Git 仓库，初始化... / ref-main is not a Git repository, initializing..."
+    # 先清空 ref-main 目录中的内容（不删除目录本身）
+    rm -rf "$REF_MAIN"/* "$REF_MAIN"/.* 2>/dev/null || true
+    # 克隆 main 分支到 ref-main
+    git clone --branch main "$AUTH_REPO_URL" "$REF_MAIN"
+fi
 
 echo ""
 echo "=== 检查 ref-data 目录 ==="
@@ -119,7 +142,7 @@ else
 
         git commit -m "chore: initialize data branch"
         git remote add origin "$AUTH_REPO_URL"
-        git push -u origin data
+        git push origin data
     fi
 fi
 

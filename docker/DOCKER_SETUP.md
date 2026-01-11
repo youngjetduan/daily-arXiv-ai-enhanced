@@ -7,7 +7,7 @@
 - `docker/Dockerfile`: Docker 镜像构建文件
 - `docker/entrypoint.sh`: Docker 容器入口脚本
 - `docker/DOCKER_SETUP.md`: Docker 部署文档（本文件）
-- `.env.example`: 环境变量模板
+- `docker/.env.example`: 环境变量模板
 
 ## 目录结构说明
 
@@ -15,20 +15,18 @@ Docker 容器内部使用 `/app` 作为根目录:
 
 ```
 /app/
+├── dailyarxiv.sh # 执行脚本
 ├── config
 │   ├── .env        # 环境变量文件（必需）
-│   └── logs/       # 日志文件目录（自动创建）
-│       └── dailyarxiv.log  # 执行日志
+│   └── dailyarxiv.log  # 执行日志
 ├── ref-main/          # main 分支代码（镜像内）
 │   ├── .git/         # Git 仓库
+│   ├── .venv/        # Python 虚拟环境
 │   ├── daily_arxiv/   # Scrapy 爬虫
 │   ├── ai/           # AI 增强处理
 │   ├── to_md/        # Markdown 转换
-│   ├── .venv/        # Python 虚拟环境
 │   ├── js/           # JavaScript 配置文件（运行时会被修改并提交到 main 分支）
-│   │   ├── auth-config.js
-│   │   └── data-config.js
-│   └── dailyarxiv.sh # 执行脚本
+│   ├── notify/       # WebHook 通知
 └── ref-data/          # data 分支数据（必须挂载外部存储）
     ├── .git/         # Git 仓库
     ├── data/         # 生成的数据文件
@@ -62,7 +60,7 @@ Docker 容器内部使用 `/app` 作为根目录:
 3. **错误处理**: 每个步骤都有错误检查和回退机制
 4. **GitHub Actions 集成**: 可通过 GitHub Actions 自动化构建镜像
 5. **数据持久化**: 通过挂载 `/app/ref-data` 实现数据持久化
-6. **日志记录**: 所有执行日志保存在 `/app/config/logs` 目录，方便排查问题
+6. **日志记录**: 所有执行日志保存在 `/app/config` 目录，方便排查问题
 
 ## 环境变量配置
 
@@ -107,7 +105,6 @@ nano config/.env
 # 4. 运行容器
 docker run -d \
     --name daily-arxiv \
-    -v "$(pwd)/ref-data:/app/ref-data" \
     -v "$(pwd)/config:/app/config" \
     daily-arxiv:latest
 ```
@@ -124,7 +121,6 @@ docker build -f docker/Dockerfile -t daily-arxiv:latest .
 # 3. 运行容器（注意：必须挂载 /app/ref-data 和 /app/config 目录）
 docker run -d \
     --name daily-arxiv \
-    -v "$(pwd)/ref-data:/app/ref-data" \
     -v "$(pwd)/config:/app/config" \
     -e OPENAI_API_KEY='your-openai-api-key' \
     -e GIT_TOKEN='your-github-token' \
@@ -141,7 +137,7 @@ docker run -d \
 docker logs -f daily-arxiv
 
 # 查看日志文件（日志保存在 config/logs 目录）
-tail -f config/logs/dailyarxiv_*.log
+tail -f config/dailyarxiv_*.log
 ```
 
 ### 方法三：GitHub Actions（推荐用于自动化构建镜像）
@@ -190,30 +186,11 @@ docker pull yourusername/daily-arxiv-ai-enhanced:latest
 # 运行容器
 docker run -d \
     --name daily-arxiv \
-    -v $(pwd)/ref-data:/app/ref-data \
     -v $(pwd)/config:/app/config \
     yourusername/daily-arxiv-ai-enhanced:latest
 ```
 
 ## 挂载目录说明
-
-### /app/ref-data（数据目录）
-**用途**：存储 arXiv 论文数据和 data 分支的 Git 仓库
-**必需**：是
-**示例**：
-```bash
-# 在宿主机上创建目录
-mkdir -p ref-data
-
-# 首次运行后，目录结构如下：
-ref-data/
-├── .git/              # data 分支 Git 仓库
-├── data/              # 生成的数据文件
-│   ├── 2025-01-10.jsonl
-│   └── 2025-01-10_AI_enhanced_Chinese.jsonl
-├── file-list.txt      # 数据文件列表
-└── README.md
-```
 
 ### /app/config（配置目录）
 **用途**：存放环境变量配置文件和执行日志
@@ -232,31 +209,24 @@ nano config/.env
 # 目录结构如下：
 config/
 ├── .env               # 环境变量配置（必需）
-└── logs/              # 日志文件目录（自动创建）
-    └── dailyarxiv.log  # 执行日志（每次运行覆盖）
+└── dailyarxiv.log     # 执行日志（每次运行覆盖）
 ```
 
 ## 常见问题解答
 
-### 1. 为什么需要挂载 /app/ref-data 目录？
-`/app/ref-data` 目录用于存储 arXiv 论文数据和 data 分支的 Git 仓库。如果不挂载：
-- 容器重启后数据会丢失
-- 无法与远程 data 分支同步
-- GitHub Pages 无法获取最新数据
-
-### 2. 为什么需要挂载 /app/config 目录？
+### 1. 为什么需要挂载 /app/config 目录？
 `/app/config` 目录用于：
 - 存放 `.env` 环境变量配置文件（必需）
 - 保存执行日志文件（便于排查问题）
 - 日志文件每次运行时覆盖，只保留最新日志
 
-### 3. js/auth-config.js 和 js/data-config.js 的修改会丢失吗？
+### 2. js/auth-config.js 和 js/data-config.js 的修改会丢失吗？
 不会。这两个文件虽然在 `/app/ref-main`（镜像内的代码目录），但是：
 - 每次运行时会被 `dailyarxiv.sh` 修改
 - 修改后会被提交到远程 main 分支
 - 下次运行时会从 main 分支拉取最新代码（包含最新的配置）
 
-### 4. 如何查看执行日志？
+### 3. 如何查看执行日志？
 有两种方式查看日志：
 
 **方式一：通过 docker 命令**
@@ -268,7 +238,7 @@ docker logs -f daily-arxiv
 **方式二：查看日志文件（推荐）**
 ```bash
 # 日志文件保存在挂载的 config/logs 目录
-tail -f config/logs/dailyarxiv.log
+tail -f config/dailyarxiv.log
 ```
 
 ### 4. 如何修改定时任务时间？
@@ -300,7 +270,7 @@ CRON_SCHEDULE=0 16 * * *
 
 3. 查看日志中的错误信息：
    ```bash
-   grep "推送" config/logs/dailyarxiv_*.log
+   grep "推送" config/dailyarxiv_*.log
    ```
 
 ### 2. Docker 构建失败
@@ -362,18 +332,7 @@ docker exec daily-arxiv curl -I https://api.openai.com
 docker exec daily-arxiv curl -I https://github.com
 ```
 
-### 8. 日志文件过大
-
-**问题**：日志文件占用过多磁盘空间
-
-**解决方法**：
-日志文件每次运行时覆盖，只保留最新日志。如果日志过大，可以手动清空：
-```bash
-# 清空日志文件
-> config/logs/dailyarxiv.log
-```
-
-### 6. 数据未提交到远程
+### 5. 数据未提交到远程
 
 **问题**：数据处理完成但没有推送到远程仓库
 
@@ -382,7 +341,7 @@ docker exec daily-arxiv curl -I https://github.com
 2. `GIT_TOKEN` 是否有 `repo` 权限
 3. 查看执行日志：
    ```bash
-   grep -A 5 "推送" config/logs/dailyarxiv_*.log
+   grep -A 5 "推送" config/dailyarxiv_*.log
    ```
 
 4. 查看 ref-data Git 状态：
@@ -392,7 +351,7 @@ docker exec daily-arxiv curl -I https://github.com
    git log -1
    ```
 
-### 7. ref-data 目录初始化失败
+### 6. ref-data 目录初始化失败
 
 **问题**：首次运行时 data 分支初始化失败
 
@@ -413,21 +372,10 @@ echo "# Data Branch" > README.md
 git add README.md
 git commit -m "chore: initialize data branch"
 git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git push -u origin data
+git push origin data
 ```
 
-### 8. 日志文件过大
-
-**问题**：日志文件占用过多磁盘空间
-
-**解决方法**：
-日志文件每次运行时覆盖，只保留最新日志。如果日志过大，可以手动清空：
-```bash
-# 清空日志文件
-> config/logs/dailyarxiv.log
-```
-
-### 9. 环境变量值包含空格
+### 7. 环境变量值包含空格
 
 **问题**：`GIT_NAME` 等环境变量包含空格导致错误
 
@@ -443,7 +391,7 @@ GIT_NAME='Your Name'
 GIT_NAME=Your Name
 ```
 
-### 10. AI 处理失败
+### 8. AI 处理失败
 
 **问题**：AI 增强处理出错
 
@@ -455,14 +403,14 @@ GIT_NAME=Your Name
 
 2. 查看 AI 处理日志：
    ```bash
-   grep -i "AI" config/logs/dailyarxiv_*.log
+   grep -i "AI" config/dailyarxiv_*.log
    ```
 
 3. 检查模型名称和 API URL：
    - `MODEL_NAME` 是否正确
    - `OPENAI_BASE_URL` 是否正确
 
-### 11. 数据分支同步冲突
+### 9. 数据分支同步冲突
 
 **问题**：多个容器同时运行导致 Git 冲突
 
@@ -484,18 +432,6 @@ GIT_NAME=Your Name
    git rebase --continue
    git push origin data
    ```
-
-## 与原 GitHub Actions 工作流的区别
-
-| 特性 | 原工作流 (run.yml) | Docker 容器 |
-|------|-------------------|----------------------------------|
-| 执行环境 | GitHub Actions Runner | Docker 容器 |
-| 代码目录 | `/app/ref-main` | `/app/ref-main`（镜像内） |
-| 数据目录 | `/app/ref-data` | `/app/ref-data`（挂载） |
-| 依赖安装 | 直接在 Runner 上安装 | 在镜像中预装 |
-| 可移植性 | 仅限 GitHub Actions | 可在任何支持 Docker 的环境运行 |
-| 资源占用 | 每次重新安装依赖 | 镜像复用，更快 |
-| 本地测试 | 较困难 | 容易（使用 docker-compose） |
 
 ## 许可证
 
