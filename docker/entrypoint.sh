@@ -67,11 +67,11 @@ log "🔧 环境变量配置:"
 echo "GIT_REPO=${GIT_REPO}" | tee -a "$LOG_FILE"
 echo "GIT_EMAIL=${GIT_EMAIL}" | tee -a "$LOG_FILE"
 echo "GIT_NAME=${GIT_NAME}" | tee -a "$LOG_FILE"
-echo "CRON_SCHEDULE=${CRON_SCHEDULE:-40 1 * * *}" | tee -a "$LOG_FILE"
+echo "CRON_SCHEDULE=${CRON_SCHEDULE:-30 1 * * *}" | tee -a "$LOG_FILE"
 
 # 生成 crontab
 CRON_CMD="cd /app && bash dailyarxiv.sh >> \"$LOG_FILE\" 2>&1"
-echo "${CRON_SCHEDULE:-40 1 * * *} $CRON_CMD" > /tmp/crontab
+echo "${CRON_SCHEDULE:-30 1 * * *} $CRON_CMD" > /tmp/crontab
 
 log "📅 生成的crontab内容:"
 cat /tmp/crontab | tee -a "$LOG_FILE"
