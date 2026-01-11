@@ -402,24 +402,29 @@ echo "=== 步骤10: 推送代码变更到 main 分支 ==="
 
 cd "$REF_MAIN"
 
-# 设置Git配置以处理自动合并 / Set Git config for automatic merging
-git config pull.rebase true
-git config rebase.autoStash true
+# 检查是否有新的提交需要推送
+if git log origin/main..HEAD --oneline 2>/dev/null | grep -q .; then
+    # 设置Git配置以处理自动合并 / Set Git config for automatic merging
+    git config pull.rebase true
+    git config rebase.autoStash true
 
-# 尝试推送代码变更到 main 分支 / Try to push code changes to main branch
-for i in {1..3}; do
-    echo "推送代码变更尝试 $i / Push code changes attempt $i"
-    if git push origin main; then
-        echo "✅ 推送成功 / Push successful"
-        break
-    else
-        echo "🟡 推送失败，拉取最新变更... / Push failed, pulling latest changes..."
-        git pull origin main --no-edit || true
-        if [ $i -eq 3 ]; then
-            echo "❌ 3次尝试后推送失败 / Failed to push after 3 attempts"
+    # 尝试推送代码变更到 main 分支 / Try to push code changes to main branch
+    for i in {1..3}; do
+        echo "推送代码变更尝试 $i / Push code changes attempt $i"
+        if git push origin main; then
+            echo "✅ 推送成功 / Push successful"
+            break
+        else
+            echo "🟡 推送失败，拉取最新变更... / Push failed, pulling latest changes..."
+            git pull origin main --no-edit || true
+            if [ $i -eq 3 ]; then
+                echo "❌ 3次尝试后推送失败 / Failed to push after 3 attempts"
+            fi
         fi
-    fi
-done
+    done
+else
+    echo "🟡 没有新的提交需要推送到 main 分支 / No new commits to push to main branch"
+fi
 
 echo ""
 echo "=== 步骤11: 设置并提交到 data 分支 ==="
@@ -449,24 +454,29 @@ echo "=== 步骤12: 推送数据变更到 data 分支 ==="
 if [ "$ai_success" = "true" ]; then
     cd "$REF_DATA"
 
-    # 设置Git配置以处理自动合并 / Set Git config for automatic merging
-    git config pull.rebase true
-    git config rebase.autoStash true
+    # 检查是否有新的提交需要推送
+    if git log origin/data..HEAD --oneline 2>/dev/null | grep -q .; then
+        # 设置Git配置以处理自动合并 / Set Git config for automatic merging
+        git config pull.rebase true
+        git config rebase.autoStash true
 
-    # 尝试推送代码变更到 data 分支 / Try to push code changes to data branch
-    for i in {1..3}; do
-        echo "推送代码变更尝试 $i / Push code changes attempt $i"
-        if git push origin data; then
-            echo "✅ 推送成功 / Push successful"
-            break
-        else
-            echo "🟡 推送失败，拉取最新变更... / Push failed, pulling latest changes..."
-            git pull origin data --no-edit || true
-            if [ $i -eq 3 ]; then
-                echo "❌ 3次尝试后推送失败 / Failed to push after 3 attempts"
+        # 尝试推送代码变更到 data 分支 / Try to push code changes to data branch
+        for i in {1..3}; do
+            echo "推送代码变更尝试 $i / Push code changes attempt $i"
+            if git push origin data; then
+                echo "✅ 推送成功 / Push successful"
+                break
+            else
+                echo "🟡 推送失败，拉取最新变更... / Push failed, pulling latest changes..."
+                git pull origin data --no-edit || true
+                if [ $i -eq 3 ]; then
+                    echo "❌ 3次尝试后推送失败 / Failed to push after 3 attempts"
+                fi
             fi
-        fi
-    done
+        done
+    else
+        echo "🟡 没有新的提交需要推送到 data 分支 / No new commits to push to data branch"
+    fi
 fi
 
 echo ""
