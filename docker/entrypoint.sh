@@ -7,10 +7,6 @@ LOG_FILE="$LOG_DIR/dailyarxiv.log"
 
 echo "📝 日志文件: $LOG_FILE"
 
-if [ -f $LOG_FILE ]; then
-    rm $LOG_FILE
-fi
-
 # 记录日志的函数
 log() {
     echo "[$(date -u '+%Y-%m-%d %H:%M:%S UTC')] $@" | tee -a "$LOG_FILE"
@@ -70,7 +66,7 @@ echo "GIT_NAME=${GIT_NAME}" | tee -a "$LOG_FILE"
 echo "CRON_SCHEDULE=${CRON_SCHEDULE:-30 1 * * *}" | tee -a "$LOG_FILE"
 
 # 生成 crontab
-CRON_CMD="cd /app && bash dailyarxiv.sh >> \"$LOG_FILE\" 2>&1"
+CRON_CMD="cd /app && rm -f \"$LOG_FILE\" && bash dailyarxiv.sh >> \"$LOG_FILE\" 2>&1"
 echo "${CRON_SCHEDULE:-30 1 * * *} $CRON_CMD" > /tmp/crontab
 
 log "📅 生成的crontab内容:"
