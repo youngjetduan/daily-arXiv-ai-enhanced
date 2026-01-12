@@ -47,7 +47,7 @@ const DATA_CONFIG = {
      * Default keywords for filtering papers
      * This will be replaced during GitHub Actions workflow execution
      */
-    defaultKeywords: 'deepseek, qwen, sparse, long context, memory, cot, kvcache, attention, efficient',
+    defaultKeywords: 'deepseek, qwen, sparse, long context, memory, cot, kvcache, attention, efficient, rag',
 
     /**
      * Default authors for filtering papers
