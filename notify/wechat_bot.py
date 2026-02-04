@@ -70,7 +70,7 @@ class WeChatBot:
 
 🎉 今日arXiv论文已成功更新并完成AI增强处理！
 
-💡 请访问[项目页面](https://dw-dengwei.github.io/daily-arXiv-ai-enhanced/)查看详情"""
+💡 请访问[项目页面](https://youngjetduan.github.io/daily-arXiv-ai-enhanced/)查看详情"""
         
         elif status == "no_content":
             content = f"""# ℹ️ 今日无新论文
@@ -81,7 +81,7 @@ class WeChatBot:
 
 📝 今日arXiv论文与历史内容重复，无新论文需要处理。
 
-💡 请访问[项目页面](https://dw-dengwei.github.io/daily-arXiv-ai-enhanced/)查看历史论文"""
+💡 请访问[项目页面](https://youngjetduan.github.io/daily-arXiv-ai-enhanced/)查看历史论文"""
         
         else:  # error
             content = f"""# ❌ arXiv论文更新失败
@@ -92,7 +92,7 @@ class WeChatBot:
 
 🚨 今日arXiv论文处理过程中出现错误，请检查工作流日志。
 
-💡 请访问[项目页面](https://dw-dengwei.github.io/daily-arXiv-ai-enhanced/)查看详情"""
+💡 请访问[项目页面](https://youngjetduan.github.io/daily-arXiv-ai-enhanced/)查看详情"""
         
         return self.send_markdown_message(content)
     
